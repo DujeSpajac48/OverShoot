@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "792712359588",
+    "project_id": "overshoot-376d8",
+    "storage_bucket": "overshoot-376d8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:792712359588:android:eda4ab0695370035a4c031",
+        "android_client_info": {
+          "package_name": "com.anonymous.OverShoot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyARkzwFI-ymC8kQcKKqzKm7nWfmy3eBuY8"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
