@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Text,
   View,
@@ -6,20 +6,29 @@ import {
   StyleSheet,
   TextInput,
   Pressable,
-  Keyboard,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-  ActivityIndicator
+  Keyboard,ScrollView,KeyboardAvoidingView,Platform,Alert,ActivityIndicator,Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as SQLite from 'expo-sqlite';
 import GenderButton from '../components/GenderButton';
 import { useNavigation } from '@react-navigation/native';
 
+
+import { supabase } from '../supabase/supabase';
+import { signUp } from '../supabase/supabaseUtils';
+
+
+function isValidEmail(email) {
+  return /.+@.+\..+/.test(email.trim());
+}
+
+
+function isValidPassword(pw) {
+  return pw.length >= 6; 
+}
+
 export default function RegisterScreen() {
   const navigation = useNavigation();
+
 
   const [formData, setFormData] = useState({
     firstName: '',
@@ -28,148 +37,131 @@ export default function RegisterScreen() {
     email: '',
     password: '',
     confirmPassword: '',
-    gender: 'Neutral'
   });
-  const [db, setDb] = useState(null);
+
+
+  const [gender, setGender] = useState(null); // zna se koji
+
+
   const [loading, setLoading] = useState(false);
-  const [dbReady, setDbReady] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const emailCheckedRef = useRef('');
 
 
-  useEffect(() => {
-    let isMounted = true;
+  async function checkEmailExists(email) {
+    if (!isValidEmail(email)) return;
+    if (emailCheckedRef.current === email) return; 
+    emailCheckedRef.current = email;
+    setErrorMsg('');
+    try {
 
-    const initDB = async () => {
-      try {
-
-        const database = await SQLite.openDatabaseAsync('RegisterSQL.db');
-        
-        
-
-        await database.execAsync(`
-          CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            firstName TEXT NOT NULL,
-            lastName TEXT NOT NULL,
-            username TEXT NOT NULL,
-            gender TEXT NOT NULL,
-            email TEXT UNIQUE NOT NULL,
-            password TEXT NOT NULL,
-            createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-          );
-        `);
-
-        if (isMounted) {
-          setDb(database);
-          setDbReady(true);
-        }
-      } catch (error) {
-        console.error('Database initialization failed:', error);
-        if (isMounted) {
-          Alert.alert('Error', 'Failed to initialize local storage');
-        }
+      const { data, error } = await supabase.auth.signUp({ email, password: 'randomPassword123!' });
+      if (!data || !data.user) {
+        setErrorMsg('This email is already in use.');
       }
-    };
+    } catch (err) {
+      setErrorMsg('This email is already in use.');
+    }
+  }
 
-    initDB();
-
-    return () => {
-      isMounted = false;
-      if (db) {
-        db.closeAsync().catch(e => console.warn('DB close error:', e));
-      }
-    };
-  }, []);
-
-  const handleGenderChange = (gender) => {
-    setFormData({...formData, gender});
+  const handleGenderChange = (newGender) => {
+    setGender(newGender);
   };
 
   const handleRegister = async () => {
+    Keyboard.dismiss();
+    setErrorMsg('');
+  
+    const { firstName, lastName, username, email, password, confirmPassword } = formData;
+  
 
-    if (loading) return;
-
-
-    if (!formData.firstName || !formData.lastName || !formData.username || 
-        !formData.email || !formData.password || !formData.confirmPassword) {
-      Alert.alert('Error', 'Please fill all fields');
+    if (!firstName.trim() || !lastName.trim() || !username.trim() || !email.trim() || !password.trim() || !confirmPassword.trim()) {
+      setErrorMsg('Please fill in all fields.');
       return;
     }
-
-    if (formData.password !== formData.confirmPassword) {
-      Alert.alert('Error', 'Passwords do not match');
+    if (!isValidEmail(email)) {
+      setErrorMsg('Invalid email address.');
       return;
     }
-
-    if (!dbReady || !db) {
-      Alert.alert('Error', 'Database not ready');
+    if (!isValidPassword(password)) {
+      setErrorMsg('Password must be at least 6 characters.');
       return;
     }
-
+    if (password !== confirmPassword) {
+      setErrorMsg('Passwords do not match.');
+      return;
+    }
+  
     setLoading(true);
-
     try {
-
-      await db.withTransactionAsync(async () => {
-        const result = await db.runAsync(
-          `INSERT INTO users 
-          (firstName, lastName, username, gender, email, password) 
-          VALUES (?, ?, ?, ?, ?, ?)`,
-          [
-            formData.firstName,
-            formData.lastName,
-            formData.username,
-            formData.gender,
-            formData.email,
-            formData.password
-          ]
-        );
-        console.log('Registration successful:', result);
-      });
-
-      Alert.alert('Success', 'Registration completed!');
-      navigation.navigate('LoginScreen');
-
-      setFormData({
-        firstName: '',
-        lastName: '',
-        username: '',
-        email: '',
-        password: '',
-        confirmPassword: '',
-        gender: 'Neutral'
-      });
-    } catch (error) {
-      console.error('Registration error:', error);
-      Alert.alert(
-        'Error', 
-        error.message.includes('UNIQUE') 
-          ? 'Email already exists' 
-          : 'Registration failed. Please try again.'
-      );
-    } finally {
+      const result = await signUp(email.trim(), password);
+      console.log('SignUp result:', result);
       setLoading(false);
+      if (!result.data || !result.data.user) {
+        setErrorMsg('This email is already in use.');
+        return;
+      }
+      setErrorMsg('');
+      Alert.alert('Registration successful!', 'Check your email to confirm your account.');
+      navigation.navigate('LoginScreen');
+    } catch (err) {
+      setLoading(false);
+      setErrorMsg('An unexpected error occurred. Please try again.');
     }
   };
+  
+
+  useEffect(() => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('Auth event:', _event);
+      if (session?.user) {
+
+
+      }
+    });
+    return () => {
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+
+  const isFormValid =
+    formData.firstName.trim() &&
+    formData.lastName.trim() &&
+    formData.username.trim() &&
+    formData.email.trim() &&
+    formData.password.trim() &&
+    formData.confirmPassword.trim() &&
+    !errorMsg;
 
   return (
     <>
       <StatusBar barStyle="dark-content" backgroundColor="#FAFAFA" />
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          behavior={Platform.OS === 'ios' ? 'height' : 'height'}
           style={{ flex: 1 }}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 74 : 0}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 44 : 44}
         >
           <ScrollView
             contentContainerStyle={{ flexGrow: 1 }}
             keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
           >
             <Pressable onPress={() => Keyboard.dismiss()} style={{ flex: 1 }}>
               <View style={styles.textConatiner}>
-                <Text style={styles.headerText}>Slika</Text>
+                <Image
+                  source={require('../images/work.png')}
+                  style={styles.image}
+                  resizeMode="contain"
+
+                />
+                {/* <Text style={styles.headerText}>Slika</Text> */}
               </View>
-              
+
               <View style={styles.loginContainer}>
+                <Text style={styles.  motivationText}>Beyond the Goal – Overshoot!</Text>
                 <View style={styles.doubleInputContainer}>
                   <View style={styles.doubleInput}>
                     <TextInput
@@ -213,7 +205,14 @@ export default function RegisterScreen() {
                       keyboardType="email-address"
                       autoCapitalize="none"
                       value={formData.email}
-                      onChangeText={(text) => setFormData({...formData, email: text})}
+                      onChangeText={async (text) => {
+                        setFormData({ ...formData, email: text });
+                        if (isValidEmail(text)) {
+                          await checkEmailExists(text);
+                        } else {
+                          setErrorMsg('');
+                        }
+                      }}
                     />
                   </View>
                 </View>
@@ -245,9 +244,9 @@ export default function RegisterScreen() {
                 </View>
 
                 <Pressable 
-                  style={[styles.registerButton, loading && styles.disabledButton]}
+                  style={[styles.registerButton, (loading || !isFormValid) && styles.disabledButton]}
                   onPress={handleRegister}
-                  disabled={loading}
+                  disabled={loading || !isFormValid}
                 >
                   {loading ? (
                     <ActivityIndicator color="white" />
@@ -255,6 +254,9 @@ export default function RegisterScreen() {
                     <Text style={styles.registerButtonText}>Register</Text>
                   )}
                 </Pressable>
+                {errorMsg ? (
+                  <Text style={{ color: 'red', marginTop: 10 }}>{errorMsg}</Text>
+                ) : null}
 
                 <View style={styles.termsContainer}>
                   <Text style={styles.termsText}>TOS</Text>
@@ -274,19 +276,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFAFA',
   },
   textConatiner: {
-    borderColor: '#E0E0E0',
-    borderTopLeftRadius: 100,
-    borderBottomLeftRadius: 100,
-    backgroundColor: '#F0F0F0',
-    borderWidth: 1,
-    marginTop: '15%',
-    marginLeft: '7%',
-    paddingLeft: '5%'
+    // borderColor: '#E0E0E0',
+    // borderTopLeftRadius: 100,
+    // borderBottomLeftRadius: 100,
+    // backgroundColor: '#F0F0F0',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    // borderWidth: 1,
+    // marginTop: '15%',
+    // marginLeft: '7%',
+    // paddingLeft: '5%'
+
   },
   headerText: {
     textAlign: 'justify',
     fontSize: 52,
     color: 'grey',
+  },
+  image:{
+    // borderWidth: 1,
+
+    width: 300,
+    height: 190,
+    marginTop: 40,
   },
   loginContainer: {
     flexGrow: 1,
@@ -298,9 +310,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
-    marginTop: '10%',
+    // marginTop: '28%',
     paddingVertical: 24,
     paddingBottom: 40,
+  },
+  motivationText:{
+    width: 300,
+    height: 30,
+    fontSize: 20,
+    textAlign: 'center',
+    // backgroundColor: 'white',
+    fontWeight: 'bold',
+
+
   },
   inputContainer: {
     width: '86%',

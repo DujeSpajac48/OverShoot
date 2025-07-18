@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, StatusBar, StyleSheet, TextInput, Pressable, Keyboard, Alert } from 'react-native';
+import { Text, View, StatusBar, StyleSheet, TextInput, Pressable, Keyboard, Alert ,Image} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Dimensions } from 'react-native';
 import * as SQLite from 'expo-sqlite';
@@ -8,45 +8,61 @@ import LoginButton from '../components/LoginButton';
 import RegisterButton from '../components/RegisterButton';
 import SpacerLine from '../components/SpacerLine';
 
+
+import {  signIn, getCurrentUser, resetPassword } from '../supabase/supabaseUtils';
+
+
 export default function LoginScreen({ navigation }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // const handleLogin = async () => {
-  //   if (!email || !password) {
-  //     Alert.alert('Error', 'Please enter both email and password');
-  //     return;
-  //   }
+  const handleLogin = async () => {
+    setLoading(true);
+    setErrorMsg('');
+    const result = await signIn(email, password);
+    setLoading(false);
+    if (result.error) {
+      setErrorMsg(result.error);
+      setEmail('');
+      setPassword('');
+      Alert.alert('Login error', result.error);
+    } else {
+      const currUser = await getCurrentUser();
+      console.log('Login result:', result, 'Current user:', currUser);
+      setUser(currUser);
+      setErrorMsg('');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'RootTabs' }],
+      });
+    }
+  };
 
-  //   try {
-  //     const db = await SQLite.openDatabaseAsync('userLogin.db');
-  //     await db.withTransactionAsync(async () => {
-  //       const result = await db.getAllAsync(
-  //         'SELECT * FROM Users WHERE email = ? AND password = ?',
-  //         [email, password]
-  //       );
-
-  //       if (result.length > 0) {
-  //         Alert.alert('Success', 'Login successful');
-  //         navigation.replace('MainScreen'); 
-  //       } else {
-  //         Alert.alert('Error', 'Invalid email or password');
-  //       }
-  //     });
-  //   } catch (error) {
-  //     console.error('Login error:', error);
-  //     Alert.alert('Error', 'Login failed');
-  //   }
-  // };
+  const handleForgotPassword = async () => {
+    if (!email) {
+      Alert.alert('Enter email', 'Please enter your email address in the field.');
+      return;
+    }
+    const result = await resetPassword(email.trim());
+    if (result.error) {
+      Alert.alert('Error', result.error);
+    } else {
+      Alert.alert('Check your email', 'We have sent you a password reset link.');
+    }
+  };
 
   return (
     <>
       <SafeAreaView style={styles.safeArea} edges={['top']}>
+        <Image
+          style={styles.imageStyle}
+          source={require('../images/clean.png')}
+          resizeMode="contain"
+        />
         <Pressable onPress={() => Keyboard.dismiss()} style={{ flex: 1 }}>
-          <View style={styles.textContainer}>
-            <Text style={styles.headerText}>OverShoot</Text>
-          </View>
-
           <View style={styles.loginContainer}>
             <View style={styles.loginInput}>
               <TextInput
@@ -55,10 +71,11 @@ export default function LoginScreen({ navigation }) {
                 style={{ color: '#333333' }}
                 inputMode="email"
                 value={email}
-                onChangeText={(text) => setEmail(text)}
+                onChangeText={setEmail}
+                autoCapitalize="none"
+                keyboardType="email-address"
               />
             </View>
-
             <View style={styles.loginInput}>
               <TextInput
                 placeholder="Password"
@@ -67,20 +84,18 @@ export default function LoginScreen({ navigation }) {
                 textContentType="password"
                 secureTextEntry
                 value={password}
-                onChangeText={(text) => setPassword(text)}
+                onChangeText={setPassword}
               />
             </View>
-
             <View style={styles.forgotPass}>
-              <Text style={{ color: 'blue' }}>Forgot password?</Text>
+              <Text style={{ color: 'blue' }} onPress={handleForgotPassword}>Forgot password?</Text>
             </View>
-
-
-            <LoginButton onPress={handleLogin} />
-            <RegisterButton onPress={() => navigation.navigate("RegisterScreen")} />
-
+            {errorMsg ? (
+              <Text style={{ color: 'red', marginTop: 10 }}>{errorMsg}</Text>
+            ) : null}
+            <LoginButton onPress={handleLogin} disabled={loading} />
+            <RegisterButton onPress={() => navigation.navigate('RegisterScreen')} />
             <SpacerLine />
-
             <Text style={{ color: 'lightgrey', marginTop: 20 }}>
               Napraviti da se Google, Apple i Facebook mogu loginati
             </Text>
@@ -95,6 +110,13 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FAFAFA',
+  },
+  imageStyle:{
+    alignSelf: 'center',
+    position: 'absolute',
+    aspectRatio: 0.4,
+    height: 280,
+    zIndex: -1,
   },
   textContainer: {
     borderColor: '#E0E0E0',
@@ -121,7 +143,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 40,
     borderTopRightRadius: 40,
     alignItems: 'center',
-    marginTop: '20%',
+    marginTop: 270,
     paddingVertical: 24,
   },
   loginInput: {

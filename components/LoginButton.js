@@ -1,24 +1,26 @@
 import { Text, Pressable, View, StyleSheet } from "react-native";
 import { Dimensions } from "react-native";
-import { useNavigation } from "@react-navigation/native";
 
 
-export default function LoginButton({onPress}){
-   const navigation = useNavigation();
+
+export default function LoginButton({onPress, disabled}){
+
 
 
 
    return(
-      < Pressable  
-      onPress={() => navigation.replace('MainScreen')}
-      style={({ pressed })=>[
-         styles.buttonContainer ,
-         pressed && styles.buttonPressed
-      ]}
+      <Pressable  
+         onPress={onPress}
+         disabled={disabled}
+         style={({ pressed })=>[
+            styles.buttonContainer ,
+            pressed && styles.buttonPressed,
+            disabled && { opacity: 0.6 }
+         ]}
       >
-      <View >
-         <Text style={styles.buttonText}>Login</Text>
-      </View>
+         <View >
+            <Text style={styles.buttonText}>Login</Text>
+         </View>
       </Pressable >
    );
 }  

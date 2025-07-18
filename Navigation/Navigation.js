@@ -53,18 +53,19 @@ function TabNavigator() {
 export default function Navigation() {
   return (
     <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="MainScreen">
+      <Stack.Navigator screenOptions={{ headerShown: false }} initialRouteName="LoginScreen">
+        <Stack.Screen name="LoginScreen" component={LoginScreen} />
+        <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
         <Stack.Screen name="RootTabs" component={TabNavigator} />
         <Stack.Screen name="Program" component={ProgramScreen} />
         <Stack.Screen name="WeekScreen" component={WeekScreen} />
         <Stack.Screen name="NewWorkoutScreen" component={NewWorkoutScreen} />
         <Stack.Screen name="MainScreen" component={MainScreen} />
-        <Stack.Screen name="RegisterScreen" component={RegisterScreen} />
-        <Stack.Screen name="LoginScreen" component={LoginScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
+
 
 const styles = StyleSheet.create({
   navBar: {
